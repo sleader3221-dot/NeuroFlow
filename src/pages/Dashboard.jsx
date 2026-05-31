@@ -1,0 +1,320 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import {
+  BookOpen, Brain, Timer, FileText, TrendingUp, Zap, Flame, Target,
+  Clock, Award, ArrowRight, Plus, ChevronRight, Star, BarChart3, CheckCircle
+} from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  RadialBarChart, RadialBar, BarChart, Bar, CartesianGrid
+} from 'recharts';
+import { getUpcomingReviews, getDueCards } from '../utils/spacedRepetition';
+
+function AnimatedCounter({ value, suffix = '' }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const end = parseInt(value) || 0;
+    if (end === 0) return;
+    const duration = 1200;
+    const step = end / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= end) { setDisplay(end); clearInterval(timer); }
+      else setDisplay(Math.floor(start));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [value]);
+  return <span>{display.toLocaleString()}{suffix}</span>;
+}
+
+export default function Dashboard() {
+  const { state, actions } = useApp();
+  const { profile, subjects, flashcards, studySessions, goals, dailyChallenges } = state;
+  const navigate = useNavigate();
+
+  const dueCards = getDueCards(flashcards).length;
+  const totalStudyHours = Math.round(profile.totalStudyTime / 60);
+  const upcomingReviews = getUpcomingReviews(flashcards);
+
+  // Chart data: last 7 days study minutes
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    const ds = date.toISOString().split('T')[0];
+    const mins = studySessions.filter(s => s.date === ds).reduce((a, s) => a + s.duration, 0);
+    return { day: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()], minutes: mins };
+  });
+
+  // Subject radial data
+  const subjectData = subjects.slice(0, 5).map(s => ({
+    name: s.name.split(' ')[0],
+    progress: s.progress,
+    fill: s.color,
+  }));
+
+  // Quiz score trend
+  const quizTrend = state.quizResults.slice(0, 7).reverse().map((r, i) => ({
+    quiz: `Q${i + 1}`, score: r.score
+  }));
+
+  const recentActivity = studySessions.slice(0, 5).map(s => ({
+    text: `Studied ${s.subject} — ${s.duration} min`,
+    time: new Date(s.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+    dot: '#7c3aed',
+  }));
+
+  const completedChallenges = dailyChallenges.filter(c => c.completed).length;
+
+  function formatTime(mins) {
+    if (mins >= 60) return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    return `${mins}m`;
+  }
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const todayStudy = studySessions
+    .filter(s => s.date === new Date().toISOString().split('T')[0])
+    .reduce((a, s) => a + s.duration, 0);
+
+  return (
+    <div className="page-enter">
+      {/* Welcome Banner */}
+      <div className="welcome-banner" style={{ marginBottom: 'var(--space-8)' }}>
+        <div className="welcome-content">
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <p style={{ color: 'var(--primary-light)', fontWeight: 600, marginBottom: 4, fontSize: 'var(--text-sm)' }}>
+                {greeting()}, {profile.name} 👋
+              </p>
+              <h1 style={{ fontSize: 'var(--text-3xl)', marginBottom: 8 }}>
+                Ready to level up today?
+              </h1>
+              <p style={{ maxWidth: 480, color: 'var(--text-secondary)', fontSize: 'var(--text-base)' }}>
+                You have <strong style={{ color: 'var(--warning-light)' }}>{dueCards} cards</strong> due for review and{' '}
+                <strong style={{ color: 'var(--accent-light)' }}>{goals.filter(g => g.status === 'active').length} active goals</strong>.
+                {todayStudy > 0 ? ` You've studied ${formatTime(todayStudy)} today!` : " Let's start your first session!"}
+              </p>
+              <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={() => navigate('/flashcards')}>
+                  <BookOpen size={16} /> Review Cards
+                </button>
+                <button className="btn btn-secondary" onClick={() => navigate('/study-plan')}>
+                  <Target size={16} /> View Plan
+                </button>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: 90, height: 90, borderRadius: '50%',
+                background: 'var(--gradient-primary)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                boxShadow: 'var(--shadow-glow-primary)', animation: 'glow 3s ease-in-out infinite'
+              }}>
+                <Star size={18} color="white" fill="white" />
+                <div style={{ color: 'white', fontWeight: 800, fontSize: 'var(--text-xl)', lineHeight: 1.2 }}>Lv.{profile.level}</div>
+              </div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                {profile.xp}/{profile.xpToNext} XP
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-4" style={{ marginBottom: 'var(--space-8)' }}>
+        {[
+          { label: 'Study Hours', value: totalStudyHours, suffix: 'h', icon: Clock, color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', change: '+2.5h', positive: true },
+          { label: 'Cards Reviewed', value: profile.cardsReviewed, icon: BookOpen, color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', change: `${dueCards} due today`, positive: dueCards === 0 },
+          { label: 'Day Streak', value: profile.streak, icon: Flame, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', change: `Best: ${profile.longestStreak}d`, positive: true },
+          { label: 'Quiz Average', value: profile.avgScore, suffix: '%', icon: BarChart3, color: '#10b981', bg: 'rgba(16,185,129,0.12)', change: '+3% this week', positive: true },
+        ].map((stat) => (
+          <div key={stat.label} className="stat-card">
+            <div className="stat-icon" style={{ background: stat.bg }}>
+              <stat.icon size={22} color={stat.color} />
+            </div>
+            <div className="stat-value">
+              <AnimatedCounter value={stat.value} suffix={stat.suffix || ''} />
+            </div>
+            <div className="stat-label">{stat.label}</div>
+            <div className={`stat-change ${stat.positive ? 'positive' : 'negative'}`}>
+              {stat.positive ? '↑' : '↓'} {stat.change}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-2" style={{ marginBottom: 'var(--space-8)' }}>
+        {/* Study Activity Chart */}
+        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+            <div>
+              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: 4 }}>Study Activity</h3>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Last 7 days (minutes)</p>
+            </div>
+            <span className="badge badge-primary"><TrendingUp size={12} /> This week</span>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={last7} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="studyGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                itemStyle={{ color: 'var(--primary-light)' }}
+              />
+              <Area type="monotone" dataKey="minutes" stroke="#7c3aed" strokeWidth={2.5} fill="url(#studyGrad)" dot={{ fill: '#7c3aed', r: 3 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Upcoming Reviews */}
+        <div className="glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+            <div>
+              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: 4 }}>Upcoming Reviews</h3>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Cards due next 7 days</p>
+            </div>
+            <button onClick={() => navigate('/flashcards')} className="btn btn-ghost btn-sm">
+              <ArrowRight size={14} />
+            </button>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={upcomingReviews} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+              <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Bottom Row: Quick Actions + Subjects + Activity */}
+      <div className="grid" style={{ gridTemplateColumns: '1fr 1.2fr 1fr', marginBottom: 'var(--space-8)', gap: 'var(--space-6)' }}>
+        {/* Quick Actions */}
+        <div className="glass-card">
+          <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-5)' }}>Quick Actions</h3>
+          <div className="quick-actions">
+            {[
+              { label: 'Review Cards', icon: BookOpen, color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', path: '/flashcards' },
+              { label: 'Take Quiz', icon: Brain, color: '#ec4899', bg: 'rgba(236,72,153,0.12)', path: '/quiz' },
+              { label: 'Start Timer', icon: Timer, color: '#f97316', bg: 'rgba(249,115,22,0.12)', path: '/timer' },
+              { label: 'New Note', icon: FileText, color: '#10b981', bg: 'rgba(16,185,129,0.12)', path: '/notes' },
+              { label: 'AI Tutor', icon: Zap, color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', path: '/ai-tutor' },
+              { label: 'Analytics', icon: BarChart3, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', path: '/analytics' },
+            ].map(a => (
+              <button key={a.label} className="quick-action-btn" onClick={() => navigate(a.path)}>
+                <div className="action-icon" style={{ background: a.bg }}>
+                  <a.icon size={20} color={a.color} />
+                </div>
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 500 }}>{a.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Subject Progress */}
+        <div className="glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)' }}>Subjects</h3>
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/analytics')}>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {subjects.slice(0, 5).map(s => (
+              <div key={s.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1rem' }}>{s.icon}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>{s.name}</span>
+                  </div>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: s.color }}>{s.progress}%</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${s.progress}%`, background: s.color }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="glass-card">
+          <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-5)' }}>Recent Activity</h3>
+          {recentActivity.length > 0 ? (
+            <div className="activity-feed">
+              {recentActivity.map((a, i) => (
+                <div key={i} className="activity-item">
+                  <div className="activity-dot" style={{ background: a.dot }} />
+                  <span className="activity-text">{a.text}</span>
+                  <span className="activity-time">{a.time}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+              <div className="empty-icon">📚</div>
+              <p style={{ fontSize: 'var(--text-sm)' }}>No sessions yet. Start studying!</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Daily Challenges */}
+      <div className="glass-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+          <div>
+            <h3 style={{ fontSize: 'var(--text-lg)' }}>🎯 Daily Challenges</h3>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>
+              {completedChallenges}/{dailyChallenges.length} completed today
+            </p>
+          </div>
+          <span className="badge badge-warning"><Award size={12} /> Earn XP</span>
+        </div>
+        <div className="grid grid-4">
+          {dailyChallenges.map(c => (
+            <div key={c.id} style={{
+              padding: 'var(--space-4)', background: c.completed ? 'rgba(16,185,129,0.08)' : 'var(--bg-glass)',
+              border: `1px solid ${c.completed ? 'rgba(16,185,129,0.25)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-lg)', position: 'relative', overflow: 'hidden'
+            }}>
+              {c.completed && (
+                <div style={{ position: 'absolute', top: 8, right: 8 }}>
+                  <CheckCircle size={16} color="var(--accent)" />
+                </div>
+              )}
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: 6, color: c.completed ? 'var(--accent-light)' : 'var(--text-primary)' }}>
+                {c.title}
+              </div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                {c.current}/{c.target} {c.type}
+              </div>
+              <div className="progress-bar" style={{ height: 4 }}>
+                <div className="progress-fill" style={{ width: `${Math.min(100, (c.current / c.target) * 100)}%` }} />
+              </div>
+              <div style={{ marginTop: 6, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--warning-light)' }}>
+                ⚡ {c.xp} XP
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
