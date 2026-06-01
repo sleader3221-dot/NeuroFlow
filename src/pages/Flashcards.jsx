@@ -33,7 +33,29 @@ export default function Flashcards() {
     if (!reviewCard) return;
     const updated = sm2Review(reviewCard, quality);
     actions.updateFlashcard(updated);
-    actions.addXP(quality >= 4 ? 15 : 5, 'Card reviewed');
+
+    // Real-time: increment cards reviewed counter
+    actions.recordCardReview(quality);
+
+    // Real-time: XP
+    const xpEarned = quality >= 4 ? 15 : quality >= 2 ? 5 : 2;
+    actions.addXP(xpEarned, 'Card reviewed');
+
+    // Real-time: progress daily flashcard challenge
+    actions.progressChallenge('flashcards', 1);
+
+    // Real-time: update subject mastery
+    const subj = state.subjects.find(s => s.name === reviewCard.subject);
+    if (subj) {
+      const subjectCards = state.flashcards.filter(c => c.subject === reviewCard.subject);
+      const masteredCount = subjectCards.filter(c => c.repetitions >= 4).length + (quality >= 4 ? 1 : 0);
+      const progress = Math.round((masteredCount / Math.max(1, subjectCards.length)) * 100);
+      actions.updateSubject({ ...subj, masteredCards: masteredCount, totalCards: subjectCards.length, progress });
+    }
+
+    // Real-time: check badges
+    actions.checkBadges();
+
     setFlipped(false);
     if (reviewIndex < dueCards.length - 1) {
       setTimeout(() => setReviewIndex(i => i + 1), 200);
@@ -60,6 +82,11 @@ export default function Flashcards() {
       tags: newCard.tags.split(',').map(t => t.trim()).filter(Boolean),
     });
     actions.addXP(8, 'Card created');
+    // Update subject totalCards count
+    const subj = state.subjects.find(s => s.name === newCard.subject);
+    if (subj) {
+      actions.updateSubject({ ...subj, totalCards: (subj.totalCards || 0) + 1 });
+    }
     setNewCard({ front: '', back: '', subject: subjects[0]?.name || '', tags: '' });
     setShowCreate(false);
     actions.toast('Flashcard created!', 'success');

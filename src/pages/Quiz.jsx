@@ -48,7 +48,9 @@ export default function Quiz() {
   }
 
   function finishQuiz() {
-    const correct = answers.filter(a => a.correct).length + (selected === quiz.questions[currentQ].correct ? 1 : 0);
+    const totalAnswered = answers.length;
+    const lastAnswer = selected !== null ? (selected === quiz.questions[currentQ].correct ? 1 : 0) : 0;
+    const correct = answers.filter(a => a.correct).length + lastAnswer;
     const total = quiz.questions.length;
     const score = Math.round((correct / total) * 100);
     const result = {
@@ -57,18 +59,29 @@ export default function Quiz() {
     };
     actions.addQuizResult(result);
     actions.addXP(score >= 90 ? 50 : score >= 70 ? 30 : 15, 'Quiz completed');
+
+    // Real-time: progress daily quiz challenge (passes score so >= 80 check works)
+    actions.progressChallenge('quiz', 1, score);
+
+    // Real-time: unlock specific badges
     if (score === 100) actions.unlockBadge('quiz_perfect');
+
+    // Real-time: check all badges (quiz_5, quiz_10, level badges)
+    actions.checkBadges();
+
     setPhase('results');
   }
 
   const lastResults = quizResults.slice(0, 5);
   const avgScore = lastResults.length ? Math.round(lastResults.reduce((a, r) => a + r.score, 0) / lastResults.length) : 0;
 
-  const radarData = subjects.slice(0, 6).map(s => ({
-    subject: s.name.split(' ')[0],
-    score: quizResults.find(r => r.subject === s.name)?.score || Math.floor(Math.random() * 40 + 50),
-    fullMark: 100,
-  }));
+  const radarData = subjects.slice(0, 6).map(s => {
+    const subjectResults = quizResults.filter(r => r.subject === s.name);
+    const score = subjectResults.length
+      ? Math.round(subjectResults.reduce((a, r) => a + r.score, 0) / subjectResults.length)
+      : 0;
+    return { subject: s.name.split(' ')[0], score, fullMark: 100 };
+  });
 
   const currentQuestion = quiz?.questions[currentQ];
   const optionColors = selected !== null

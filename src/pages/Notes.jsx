@@ -40,9 +40,13 @@ export default function Notes() {
       tags: newNote.tags.split(',').map(t => t.trim()).filter(Boolean),
     });
     actions.addXP(8, 'Note created');
+    // Real-time: progress daily notes challenge
+    actions.progressChallenge('notes', 1);
+    // Real-time: check note badges
+    actions.checkBadges();
     setNewNote({ title: '', content: '', subject: subjects[0]?.name || '', color: NOTE_COLORS[0], tags: '', pinned: false });
     setShowCreate(false);
-    actions.toast('Note saved!', 'success');
+    actions.toast('Note saved! ✍️', 'success');
   }
 
   function handleSave() {

@@ -58,13 +58,25 @@ export default function Timer() {
 
   function handleComplete() {
     if (mode === 'work') {
-      const elapsed = Math.round((Date.now() - (startTimeRef.current || Date.now())) / 60000) || pomodoroSettings.work;
       const newCount = sessionCount + 1;
       setSessionCount(newCount);
       setTotalToday(t => t + pomodoroSettings.work);
-      setCompletedSessions(prev => [...prev, { subject: selectedSubject, duration: pomodoroSettings.work, time: new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) }]);
+      setCompletedSessions(prev => [...prev, {
+        subject: selectedSubject,
+        duration: pomodoroSettings.work,
+        time: new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })
+      }]);
+
+      // Real-time: log session to global state (updates totalStudyTime + streak)
       actions.addSession({ subject: selectedSubject, duration: pomodoroSettings.work, type: 'pomodoro', cardsReviewed: 0 });
       actions.addXP(25, 'Pomodoro completed');
+
+      // Real-time: progress daily challenge
+      actions.progressChallenge('pomodoro', 1);
+
+      // Real-time: check badges (first_session, streak, study time)
+      actions.checkBadges();
+
       actions.toast(`🍅 Pomodoro #${newCount} complete! Take a break.`, 'success');
       if (newCount % pomodoroSettings.sessions === 0) setMode('longBreak');
       else setMode('shortBreak');
