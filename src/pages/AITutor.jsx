@@ -38,13 +38,16 @@ export default function AITutor() {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI thinking delay
     const delay = 800 + Math.random() * 1200;
     setTimeout(() => {
       const response = getAIResponse(msg);
       actions.addChatMessage({ role: 'ai', content: response });
       setIsTyping(false);
       actions.addXP(3, 'AI tutoring session');
+
+      // Track ai_chat badge: unlock after 5 user messages
+      const userMsgCount = chatHistory.filter(m => m.role === 'user').length + 1;
+      if (userMsgCount >= 5) actions.unlockBadge('ai_chat');
     }, delay);
   }
 

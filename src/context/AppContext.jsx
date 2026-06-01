@@ -313,46 +313,47 @@ export function AppProvider({ children }) {
       });
     },
 
-    // Check and unlock badges based on current state
-    checkBadges: (updatedProfile, updatedFlashcards, updatedNotes, updatedQuizResults) => {
-      const profile = updatedProfile || state.profile;
-      const flashcards = updatedFlashcards || state.flashcards;
-      const notes = updatedNotes || state.notes;
-      const quizResults = updatedQuizResults || state.quizResults;
-      const badges = state.badges;
+    // Check and unlock badges based on current live state
+    checkBadges: () => {
+      const p  = state.profile;
+      const bs = state.badges;
+      const ns = state.notes;
+      const qs = state.quizResults;
+      const ss = state.studySessions;
+      const subs = state.subjects;
 
-      const toUnlock = [];
-      const cardsReviewed = profile.cardsReviewed;
-      const quizzesTaken = profile.quizzesTaken;
-      const streak = profile.streak;
-      const level = profile.level;
-
-      if (cardsReviewed >= 1 && !badges.find(b => b.id === 'first_card')?.unlocked) toUnlock.push('first_card');
-      if (cardsReviewed >= 10 && !badges.find(b => b.id === 'cards_10')?.unlocked) toUnlock.push('cards_10');
-      if (cardsReviewed >= 50 && !badges.find(b => b.id === 'cards_50')?.unlocked) toUnlock.push('cards_50');
-      if (cardsReviewed >= 200 && !badges.find(b => b.id === 'cards_200')?.unlocked) toUnlock.push('cards_200');
-      if (cardsReviewed >= 500 && !badges.find(b => b.id === 'cards_500')?.unlocked) toUnlock.push('cards_500');
-      if (cardsReviewed >= 1000 && !badges.find(b => b.id === 'cards_1000')?.unlocked) toUnlock.push('cards_1000');
-      if (streak >= 3 && !badges.find(b => b.id === 'streak_3')?.unlocked) toUnlock.push('streak_3');
-      if (streak >= 7 && !badges.find(b => b.id === 'streak_7')?.unlocked) toUnlock.push('streak_7');
-      if (streak >= 14 && !badges.find(b => b.id === 'streak_14')?.unlocked) toUnlock.push('streak_14');
-      if (streak >= 30 && !badges.find(b => b.id === 'streak_30')?.unlocked) toUnlock.push('streak_30');
-      if (quizzesTaken >= 1 && quizResults.some(r => r.score === 100) && !badges.find(b => b.id === 'quiz_perfect')?.unlocked) toUnlock.push('quiz_perfect');
-      if (quizzesTaken >= 5 && !badges.find(b => b.id === 'quiz_5')?.unlocked) toUnlock.push('quiz_5');
-      if (quizzesTaken >= 10 && !badges.find(b => b.id === 'quiz_10')?.unlocked) toUnlock.push('quiz_10');
-      if (notes.length >= 1 && !badges.find(b => b.id === 'notes_1')?.unlocked) toUnlock.push('notes_1');
-      if (notes.length >= 10 && !badges.find(b => b.id === 'notes_10')?.unlocked) toUnlock.push('notes_10');
-      if (level >= 5 && !badges.find(b => b.id === 'level_5')?.unlocked) toUnlock.push('level_5');
-      if (level >= 10 && !badges.find(b => b.id === 'level_10')?.unlocked) toUnlock.push('level_10');
-
-      toUnlock.forEach(id => {
-        const badge = state.badges.find(b => b.id === id && !b.unlocked);
+      const need = (id) => !bs.find(b => b.id === id)?.unlocked;
+      const unlock = (id) => {
+        const badge = bs.find(b => b.id === id && !b.unlocked);
         if (badge) {
           dispatch({ type: 'UNLOCK_BADGE', payload: id });
           dispatch({ type: 'ADD_TOAST', payload: { type: 'success', message: `🏆 Badge Unlocked: ${badge.name}!` } });
           dispatch({ type: 'ADD_XP', payload: 30 });
         }
-      });
+      };
+
+      if (p.cardsReviewed >= 1   && need('first_card'))   unlock('first_card');
+      if (p.cardsReviewed >= 10  && need('cards_10'))     unlock('cards_10');
+      if (p.cardsReviewed >= 50  && need('cards_50'))     unlock('cards_50');
+      if (p.cardsReviewed >= 200 && need('cards_200'))    unlock('cards_200');
+      if (p.cardsReviewed >= 500 && need('cards_500'))    unlock('cards_500');
+      if (p.cardsReviewed >= 1000&& need('cards_1000'))   unlock('cards_1000');
+      if (p.streak >= 3          && need('streak_3'))     unlock('streak_3');
+      if (p.streak >= 7          && need('streak_7'))     unlock('streak_7');
+      if (p.streak >= 14         && need('streak_14'))    unlock('streak_14');
+      if (p.streak >= 30         && need('streak_30'))    unlock('streak_30');
+      if (p.quizzesTaken >= 1 && qs.some(r => r.score === 100) && need('quiz_perfect')) unlock('quiz_perfect');
+      if (p.quizzesTaken >= 5    && need('quiz_5'))       unlock('quiz_5');
+      if (p.quizzesTaken >= 10   && need('quiz_10'))      unlock('quiz_10');
+      if (ns.length >= 1         && need('notes_1'))      unlock('notes_1');
+      if (ns.length >= 10        && need('notes_10'))     unlock('notes_10');
+      if (p.level >= 5           && need('level_5'))      unlock('level_5');
+      if (p.level >= 10          && need('level_10'))     unlock('level_10');
+      if (ss.length >= 1         && need('first_session'))unlock('first_session');
+      if (p.totalStudyTime >= 60 && need('study_1h'))     unlock('study_1h');
+      if (p.totalStudyTime >= 300&& need('study_5h'))     unlock('study_5h');
+      const studiedSubs = new Set(ss.map(s => s.subject));
+      if (studiedSubs.size >= 5  && need('subjects_5'))   unlock('subjects_5');
     },
 
     addGoal: (goal) => dispatch({ type: 'ADD_GOAL', payload: { id: generateId(), ...goal } }),

@@ -47,16 +47,38 @@ export default function Dashboard() {
     return { day: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()], minutes: mins };
   });
 
-  // Subject radial data
-  const subjectData = subjects.slice(0, 5).map(s => ({
-    name: s.name.split(' ')[0],
-    progress: s.progress,
-    fill: s.color,
-  }));
+  // Real week-over-week comparison
+  const thisWeekMins = last7.reduce((a, d) => a + d.minutes, 0);
+  const prevWeekMins = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (13 - i));
+    const ds = date.toISOString().split('T')[0];
+    return studySessions.filter(s => s.date === ds).reduce((a, s) => a + s.duration, 0);
+  }).reduce((a, m) => a + m, 0);
+  const weekDiff = thisWeekMins - prevWeekMins;
+  const weekLabel = studySessions.length === 0
+    ? 'Start studying!'
+    : weekDiff === 0
+    ? 'Same as last week'
+    : `${weekDiff > 0 ? '+' : ''}${Math.round(Math.abs(weekDiff) / 60 * 10) / 10}h ${weekDiff > 0 ? 'more' : 'less'} this week`;
 
-  // Quiz score trend
+  // Real quiz trend
+  const recent5 = state.quizResults.slice(0, 5);
+  const older5  = state.quizResults.slice(5, 10);
+  const r5avg = recent5.length ? Math.round(recent5.reduce((a, r) => a + r.score, 0) / recent5.length) : 0;
+  const o5avg = older5.length  ? Math.round(older5.reduce((a, r) => a + r.score, 0) / older5.length)  : 0;
+  const quizDiff = r5avg - o5avg;
+  const quizLabel = state.quizResults.length === 0
+    ? 'Take your first quiz!'
+    : state.quizResults.length < 2
+    ? 'Keep going!'
+    : quizDiff === 0
+    ? 'Consistent!'
+    : `${quizDiff > 0 ? '+' : ''}${quizDiff}% vs previous`;
+
+  // Quiz score trend chart
   const quizTrend = state.quizResults.slice(0, 7).reverse().map((r, i) => ({
-    quiz: `Q${i + 1}`, score: r.score
+    quiz: `Q${i + 1}`, score: r.score,
   }));
 
   const recentActivity = studySessions.slice(0, 5).map(s => ({
@@ -131,10 +153,10 @@ export default function Dashboard() {
       {/* Stat Cards */}
       <div className="grid grid-4" style={{ marginBottom: 'var(--space-8)' }}>
         {[
-          { label: 'Study Hours', value: totalStudyHours, suffix: 'h', icon: Clock, color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', change: '+2.5h', positive: true },
-          { label: 'Cards Reviewed', value: profile.cardsReviewed, icon: BookOpen, color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', change: `${dueCards} due today`, positive: dueCards === 0 },
-          { label: 'Day Streak', value: profile.streak, icon: Flame, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', change: `Best: ${profile.longestStreak}d`, positive: true },
-          { label: 'Quiz Average', value: profile.avgScore, suffix: '%', icon: BarChart3, color: '#10b981', bg: 'rgba(16,185,129,0.12)', change: '+3% this week', positive: true },
+          { label: 'Study Hours', value: totalStudyHours, suffix: 'h', icon: Clock, color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', change: weekLabel, positive: weekDiff >= 0 },
+          { label: 'Cards Reviewed', value: profile.cardsReviewed, icon: BookOpen, color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', change: dueCards === 0 ? '✅ All caught up!' : `${dueCards} due today`, positive: dueCards === 0 },
+          { label: 'Day Streak', value: profile.streak, icon: Flame, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', change: profile.longestStreak > 0 ? `Best: ${profile.longestStreak}d` : 'Start your streak!', positive: true },
+          { label: 'Quiz Average', value: profile.avgScore, suffix: '%', icon: BarChart3, color: '#10b981', bg: 'rgba(16,185,129,0.12)', change: quizLabel, positive: quizDiff >= 0 },
         ].map((stat) => (
           <div key={stat.label} className="stat-card">
             <div className="stat-icon" style={{ background: stat.bg }}>

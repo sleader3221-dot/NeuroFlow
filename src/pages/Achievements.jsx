@@ -9,10 +9,10 @@ export default function Achievements() {
   const locked = badges.filter(b => !b.unlocked);
 
   const stats = [
-    { label: 'Badges Earned', value: unlocked.length, icon: Trophy, color: '#f59e0b' },
-    { label: 'Current Level', value: profile.level, icon: Star, color: '#7c3aed' },
-    { label: 'Total XP', value: profile.xp + (profile.level - 1) * profile.xpToNext, icon: Zap, color: '#06b6d4' },
-    { label: 'Best Streak', value: `${profile.longestStreak}d`, icon: Flame, color: '#ef4444' },
+    { label: 'Badges Earned',  value: unlocked.length,          icon: Trophy, color: '#f59e0b' },
+    { label: 'Current Level',  value: `Lv. ${profile.level}`,   icon: Star,   color: '#7c3aed' },
+    { label: 'XP This Level',  value: `${profile.xp} XP`,       icon: Zap,    color: '#06b6d4' },
+    { label: 'Best Streak',    value: `${profile.longestStreak}d`, icon: Flame, color: '#ef4444' },
   ];
 
   return (

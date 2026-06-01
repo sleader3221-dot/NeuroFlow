@@ -36,7 +36,7 @@ export default function Sidebar() {
       {sidebarOpen && (
         <div className="sidebar-overlay" onClick={actions.toggleSidebar} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-          zIndex: 39, display: 'none'
+          zIndex: 39,
         }} />
       )}
 

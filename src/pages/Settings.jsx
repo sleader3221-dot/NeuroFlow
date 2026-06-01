@@ -55,9 +55,14 @@ export default function Settings() {
   }
 
   function resetData() {
-    if (window.confirm('⚠️ This will clear ALL your data. Are you sure?')) {
-      localStorage.clear();
-      window.location.reload();
+    if (window.confirm('⚠️ This will clear ALL your data and return to the login screen. Are you sure?')) {
+      // Clear all app data but keep version so guard doesn't re-trigger
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('neuroflow_'))
+        .forEach(k => localStorage.removeItem(k));
+      // Also clear version so fresh defaults load on next visit
+      localStorage.removeItem('neuroflow_version');
+      window.location.href = '/';
     }
   }
 
