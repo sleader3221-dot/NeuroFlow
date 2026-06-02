@@ -34,6 +34,6 @@ const run = (args) => {
 };
 
 run(['add', '-A']);
-run(['commit', '-m', 'feat: 10 features - AI flashcard gen, CSV import, keyboard shortcuts, Markdown notes, Focus Sounds, Weekly Report, Exam Countdown, Ebbinghaus curve, Web Notifications, PWA']);
+run(['commit', '-m', 'fix: add vercel.json SPA rewrite to fix 404 on browser refresh']);
 run(['push', 'origin', 'main']);
 console.log('Done!');
