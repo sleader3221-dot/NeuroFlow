@@ -10,6 +10,16 @@ import { calculateXP } from '../utils/ai';
 const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
 
+// ── Default Challenges ────────────────────────────────────────
+function getDefaultChallenges() {
+  return [
+    { id: '1', title: 'Review 10 flashcards', target: 10, current: 0, xp: 50, type: 'flashcards', completed: false },
+    { id: '2', title: 'Complete a 25-minute Pomodoro', target: 1, current: 0, xp: 75, type: 'pomodoro', completed: false },
+    { id: '3', title: 'Score 80%+ on a quiz', target: 80, current: 0, xp: 100, type: 'quiz', completed: false },
+    { id: '4', title: 'Create 1 new note', target: 1, current: 0, xp: 30, type: 'notes', completed: false },
+  ];
+}
+
 // ── Initial State ────────────────────────────────────────────
 function getInitialState() {
   return {
@@ -28,50 +38,31 @@ function getInitialState() {
     quizResults: storage.get('quizResults', []),
     chatHistory: storage.get('chatHistory', []),
     dailyChallenges: storage.get('dailyChallenges', getDefaultChallenges()),
-    achievements: storage.get('achievements', []),
     examDate: storage.get('examDate', null),
     examLabel: storage.get('examLabel', ''),
   };
 }
 
-function getDefaultChallenges() {
-  return [
-    { id: '1', title: 'Review 10 flashcards', target: 10, current: 0, xp: 50, type: 'flashcards', completed: false },
-    { id: '2', title: 'Complete a 25-minute Pomodoro', target: 1, current: 0, xp: 75, type: 'pomodoro', completed: false },
-    { id: '3', title: 'Score 80%+ on a quiz', target: 80, current: 0, xp: 100, type: 'quiz', completed: false },
-    { id: '4', title: 'Create 1 new note', target: 1, current: 0, xp: 30, type: 'notes', completed: false },
-  ];
-}
-
 // ── Reducer ───────────────────────────────────────────────────
 function reducer(state, action) {
   switch (action.type) {
-    // Theme
     case 'SET_THEME':
       return { ...state, theme: action.payload };
 
-    // Profile
     case 'UPDATE_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.payload } };
 
-    // XP & Level
     case 'ADD_XP': {
-      const xp = state.profile.xp + action.payload;
-      let level = state.profile.level;
-      let newXp = xp;
-      let newXpToNext = state.profile.xpToNext;
-      while (newXp >= newXpToNext) {
+      let { xp, level, xpToNextLevel } = state.profile;
+      xp += action.payload;
+      while (xp >= xpToNextLevel) {
+        xp -= xpToNextLevel;
         level += 1;
-        newXp -= newXpToNext;
-        newXpToNext = Math.round(newXpToNext * 1.25);
+        xpToNextLevel = Math.round(xpToNextLevel * 1.25);
       }
-      return {
-        ...state,
-        profile: { ...state.profile, xp: newXp, level, xpToNext: newXpToNext }
-      };
+      return { ...state, profile: { ...state.profile, xp, level, xpToNextLevel } };
     }
 
-    // Subjects
     case 'ADD_SUBJECT':
       return { ...state, subjects: [...state.subjects, action.payload] };
     case 'UPDATE_SUBJECT':
@@ -79,7 +70,6 @@ function reducer(state, action) {
     case 'DELETE_SUBJECT':
       return { ...state, subjects: state.subjects.filter(s => s.id !== action.payload) };
 
-    // Flashcards
     case 'ADD_FLASHCARD':
       return { ...state, flashcards: [...state.flashcards, action.payload] };
     case 'ADD_FLASHCARDS':
@@ -89,7 +79,6 @@ function reducer(state, action) {
     case 'DELETE_FLASHCARD':
       return { ...state, flashcards: state.flashcards.filter(c => c.id !== action.payload) };
 
-    // Notes
     case 'ADD_NOTE':
       return { ...state, notes: [action.payload, ...state.notes] };
     case 'UPDATE_NOTE':
@@ -97,12 +86,9 @@ function reducer(state, action) {
     case 'DELETE_NOTE':
       return { ...state, notes: state.notes.filter(n => n.id !== action.payload) };
 
-    // Study Sessions
     case 'ADD_SESSION': {
       const newSessions = [action.payload, ...state.studySessions];
-      const newTotalTime = state.profile.totalStudyTime + action.payload.duration;
-
-      // Check and update streak
+      const newTotalTime = state.profile.totalStudyTime + (action.payload.duration || 0);
       const today = new Date().toISOString().split('T')[0];
       const lastDate = state.profile.lastStudyDate;
       let newStreak = state.profile.streak;
@@ -110,14 +96,13 @@ function reducer(state, action) {
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
         newStreak = lastDate === yesterday ? state.profile.streak + 1 : 1;
       }
-
       return {
         ...state,
         studySessions: newSessions,
         profile: {
           ...state.profile,
           totalStudyTime: newTotalTime,
-          cardsReviewed: state.profile.cardsReviewed + (action.payload.cardsReviewed || 0),
+          // cardsReviewed tracked via INCREMENT_CARDS_REVIEWED to avoid double-counting
           streak: newStreak,
           longestStreak: Math.max(state.profile.longestStreak, newStreak),
           lastStudyDate: today,
@@ -125,25 +110,18 @@ function reducer(state, action) {
       };
     }
 
-    // Streak
     case 'UPDATE_STREAK':
       return { ...state, profile: { ...state.profile, streak: action.payload, longestStreak: Math.max(state.profile.longestStreak, action.payload) } };
 
-    // Increment cards reviewed (real-time)
     case 'INCREMENT_CARDS_REVIEWED':
-      return {
-        ...state,
-        profile: { ...state.profile, cardsReviewed: state.profile.cardsReviewed + 1 }
-      };
+      return { ...state, profile: { ...state.profile, cardsReviewed: state.profile.cardsReviewed + 1 } };
 
-    // Badges
     case 'UNLOCK_BADGE':
       return {
         ...state,
         badges: state.badges.map(b => b.id === action.payload ? { ...b, unlocked: true, unlockedAt: new Date().toISOString() } : b)
       };
 
-    // Goals
     case 'ADD_GOAL':
       return { ...state, goals: [...state.goals, action.payload] };
     case 'UPDATE_GOAL':
@@ -151,11 +129,9 @@ function reducer(state, action) {
     case 'DELETE_GOAL':
       return { ...state, goals: state.goals.filter(g => g.id !== action.payload) };
 
-    // Study Plan
     case 'SET_STUDY_PLAN':
       return { ...state, studyPlan: action.payload };
 
-    // Quiz Results
     case 'ADD_QUIZ_RESULT': {
       const allResults = [action.payload, ...state.quizResults];
       const avgScore = Math.round(allResults.reduce((a, r) => a + r.score, 0) / allResults.length);
@@ -166,38 +142,30 @@ function reducer(state, action) {
       };
     }
 
-    // Chat
     case 'ADD_CHAT_MESSAGE':
       return { ...state, chatHistory: [...state.chatHistory, action.payload] };
     case 'CLEAR_CHAT':
       return { ...state, chatHistory: [] };
 
-    // Pomodoro Settings
     case 'UPDATE_POMODORO':
       return { ...state, pomodoroSettings: { ...state.pomodoroSettings, ...action.payload } };
 
-    // Daily Challenges
     case 'UPDATE_CHALLENGE':
       return { ...state, dailyChallenges: state.dailyChallenges.map(c => c.id === action.payload.id ? { ...c, ...action.payload } : c) };
-
-    // Reset daily challenges (called at day change)
     case 'RESET_CHALLENGES':
       return { ...state, dailyChallenges: getDefaultChallenges() };
 
-    // Toasts
     case 'ADD_TOAST':
       return { ...state, toasts: [...state.toasts, { id: generateId(), ...action.payload }] };
     case 'REMOVE_TOAST':
       return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) };
 
-    // Sidebar
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
 
     case 'SET_EXAM':
       return { ...state, examDate: action.payload.date, examLabel: action.payload.label };
 
-    // Full reset (wipe localStorage and reset to defaults)
     case 'RESET_ALL':
       storage.clear();
       return getInitialState();
@@ -211,7 +179,7 @@ function reducer(state, action) {
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, getInitialState);
 
-  // Persist to localStorage on state change
+  // Persist to localStorage on every state change
   useEffect(() => {
     storage.set('theme', state.theme);
     storage.set('profile', state.profile);
@@ -230,12 +198,31 @@ export function AppProvider({ children }) {
     storage.set('examLabel', state.examLabel);
   }, [state]);
 
-  // Apply theme to document
+  // Auto-reset daily challenges at midnight / new day
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const lastReset = localStorage.getItem('neuroflow_challenge_date');
+    if (lastReset !== today) {
+      localStorage.setItem('neuroflow_challenge_date', today);
+      if (lastReset) dispatch({ type: 'RESET_CHALLENGES' });
+    }
+    // Timer to reset at next midnight
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const timer = setTimeout(() => {
+      localStorage.setItem('neuroflow_challenge_date', new Date().toISOString().split('T')[0]);
+      dispatch({ type: 'RESET_CHALLENGES' });
+    }, midnight - now);
+    return () => clearTimeout(timer);
+  }, []); // runs once on mount
+
+  // Apply theme class to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.theme);
   }, [state.theme]);
 
-  // Auto-remove toasts
+  // Auto-remove toasts after 4s
   useEffect(() => {
     if (state.toasts.length > 0) {
       const timer = setTimeout(() => {
@@ -266,7 +253,7 @@ export function AppProvider({ children }) {
     updateFlashcard: (card) => dispatch({ type: 'UPDATE_FLASHCARD', payload: card }),
     deleteFlashcard: (id) => dispatch({ type: 'DELETE_FLASHCARD', payload: id }),
 
-    // Called every time a card is reviewed — updates counter + challenges + badges
+    // Only increments counter — progressChallenge + addXP called separately in Flashcards.jsx
     recordCardReview: (quality) => {
       dispatch({ type: 'INCREMENT_CARDS_REVIEWED' });
     },
@@ -287,7 +274,7 @@ export function AppProvider({ children }) {
       }
     },
 
-    // Progress a daily challenge by amount (defaults to 1). Auto-completes and awards XP.
+    // Progress a daily challenge by amount. Auto-completes and awards XP.
     progressChallenge: (type, amount = 1, scoreValue = null) => {
       const challenges = state.dailyChallenges;
       challenges.forEach(c => {
@@ -327,9 +314,8 @@ export function AppProvider({ children }) {
       const ns = state.notes;
       const qs = state.quizResults;
       const ss = state.studySessions;
-      const subs = state.subjects;
 
-      const need = (id) => !bs.find(b => b.id === id)?.unlocked;
+      const need   = (id) => !bs.find(b => b.id === id)?.unlocked;
       const unlock = (id) => {
         const badge = bs.find(b => b.id === id && !b.unlocked);
         if (badge) {
@@ -339,45 +325,76 @@ export function AppProvider({ children }) {
         }
       };
 
-      if (p.cardsReviewed >= 1   && need('first_card'))   unlock('first_card');
-      if (p.cardsReviewed >= 10  && need('cards_10'))     unlock('cards_10');
-      if (p.cardsReviewed >= 50  && need('cards_50'))     unlock('cards_50');
-      if (p.cardsReviewed >= 200 && need('cards_200'))    unlock('cards_200');
-      if (p.cardsReviewed >= 500 && need('cards_500'))    unlock('cards_500');
-      if (p.cardsReviewed >= 1000&& need('cards_1000'))   unlock('cards_1000');
-      if (p.streak >= 3          && need('streak_3'))     unlock('streak_3');
-      if (p.streak >= 7          && need('streak_7'))     unlock('streak_7');
-      if (p.streak >= 14         && need('streak_14'))    unlock('streak_14');
-      if (p.streak >= 30         && need('streak_30'))    unlock('streak_30');
+      // Cards reviewed
+      if (p.cardsReviewed >= 1    && need('first_card'))    unlock('first_card');
+      if (p.cardsReviewed >= 10   && need('cards_10'))      unlock('cards_10');
+      if (p.cardsReviewed >= 50   && need('cards_50'))      unlock('cards_50');
+      if (p.cardsReviewed >= 200  && need('cards_200'))     unlock('cards_200');
+      if (p.cardsReviewed >= 500  && need('cards_500'))     unlock('cards_500');
+      if (p.cardsReviewed >= 1000 && need('cards_1000'))    unlock('cards_1000');
+      // Streaks
+      if (p.streak >= 3           && need('streak_3'))      unlock('streak_3');
+      if (p.streak >= 7           && need('streak_7'))      unlock('streak_7');
+      if (p.streak >= 14          && need('streak_14'))     unlock('streak_14');
+      if (p.streak >= 30          && need('streak_30'))     unlock('streak_30');
+      // Quiz
       if (p.quizzesTaken >= 1 && qs.some(r => r.score === 100) && need('quiz_perfect')) unlock('quiz_perfect');
-      if (p.quizzesTaken >= 5    && need('quiz_5'))       unlock('quiz_5');
-      if (p.quizzesTaken >= 10   && need('quiz_10'))      unlock('quiz_10');
-      if (ns.length >= 1         && need('notes_1'))      unlock('notes_1');
-      if (ns.length >= 10        && need('notes_10'))     unlock('notes_10');
-      if (p.level >= 5           && need('level_5'))      unlock('level_5');
-      if (p.level >= 10          && need('level_10'))     unlock('level_10');
-      if (ss.length >= 1         && need('first_session'))unlock('first_session');
-      if (p.totalStudyTime >= 60 && need('study_1h'))     unlock('study_1h');
-      if (p.totalStudyTime >= 300&& need('study_5h'))     unlock('study_5h');
+      if (p.quizzesTaken >= 5     && need('quiz_5'))        unlock('quiz_5');
+      if (p.quizzesTaken >= 10    && need('quiz_10'))       unlock('quiz_10');
+      // Notes
+      if (ns.length >= 1          && need('notes_1'))       unlock('notes_1');
+      if (ns.length >= 10         && need('notes_10'))      unlock('notes_10');
+      // Level
+      if (p.level >= 5            && need('level_5'))       unlock('level_5');
+      if (p.level >= 10           && need('level_10'))      unlock('level_10');
+      // Sessions / study time
+      if (ss.length >= 1          && need('first_session')) unlock('first_session');
+      if (p.totalStudyTime >= 60  && need('study_1h'))      unlock('study_1h');
+      if (p.totalStudyTime >= 300 && need('study_5h'))      unlock('study_5h');
+      if (p.totalStudyTime >= 600 && need('study_10h'))     unlock('study_10h');
+      // Multi-subject
       const studiedSubs = new Set(ss.map(s => s.subject));
-      if (studiedSubs.size >= 5  && need('subjects_5'))   unlock('subjects_5');
+      if (studiedSubs.size >= 5   && need('subjects_5'))    unlock('subjects_5');
+      // AI Chat badge — unlocks after 5 user messages to AI Tutor
+      const userMsgs = state.chatHistory.filter(m => m.role === 'user').length;
+      if (userMsgs >= 5           && need('ai_chat'))       unlock('ai_chat');
+      // Flashcard collection badge
+      if (state.flashcards.length >= 20 && need('flashcards_20')) unlock('flashcards_20');
     },
 
-    addGoal: (goal) => dispatch({ type: 'ADD_GOAL', payload: { id: generateId(), ...goal } }),
-    updateGoal: (goal) => dispatch({ type: 'UPDATE_GOAL', payload: goal }),
-    deleteGoal: (id) => dispatch({ type: 'DELETE_GOAL', payload: id }),
+    addGoal:    (goal)    => dispatch({ type: 'ADD_GOAL',    payload: { id: generateId(), ...goal } }),
+    updateGoal: (goal)    => dispatch({ type: 'UPDATE_GOAL', payload: goal }),
+    deleteGoal: (id)      => dispatch({ type: 'DELETE_GOAL', payload: id }),
 
     setStudyPlan: (plan) => dispatch({ type: 'SET_STUDY_PLAN', payload: plan }),
+
     addQuizResult: (result) => dispatch({ type: 'ADD_QUIZ_RESULT', payload: { id: generateId(), date: new Date().toISOString(), ...result } }),
-    addChatMessage: (msg) => dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { id: generateId(), timestamp: new Date().toISOString(), ...msg } }),
+
+    // Add chat message + auto-check ai_chat badge on 5th user message
+    addChatMessage: (msg) => {
+      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { id: generateId(), timestamp: new Date().toISOString(), ...msg } });
+      if (msg.role === 'user') {
+        const userMsgCount = state.chatHistory.filter(m => m.role === 'user').length + 1;
+        if (userMsgCount >= 5) {
+          const badge = state.badges.find(b => b.id === 'ai_chat' && !b.unlocked);
+          if (badge) {
+            dispatch({ type: 'UNLOCK_BADGE', payload: 'ai_chat' });
+            dispatch({ type: 'ADD_TOAST', payload: { type: 'success', message: '🏆 Badge Unlocked: AI Apprentice!' } });
+            dispatch({ type: 'ADD_XP', payload: 30 });
+          }
+        }
+      }
+    },
     clearChat: () => dispatch({ type: 'CLEAR_CHAT' }),
-    updatePomodoro: (settings) => dispatch({ type: 'UPDATE_POMODORO', payload: settings }),
+
+    updatePomodoro:  (settings)  => dispatch({ type: 'UPDATE_POMODORO',  payload: settings }),
     updateChallenge: (challenge) => dispatch({ type: 'UPDATE_CHALLENGE', payload: challenge }),
-    toast: (message, type = 'info') => dispatch({ type: 'ADD_TOAST', payload: { type, message } }),
-    removeToast: (id) => dispatch({ type: 'REMOVE_TOAST', payload: id }),
-    toggleSidebar: () => dispatch({ type: 'TOGGLE_SIDEBAR' }),
-    resetAll: () => dispatch({ type: 'RESET_ALL' }),
-    setExamDate: (date, label) => dispatch({ type: 'SET_EXAM', payload: { date, label } }),
+
+    toast:        (message, type = 'info') => dispatch({ type: 'ADD_TOAST',    payload: { type, message } }),
+    removeToast:  (id)                     => dispatch({ type: 'REMOVE_TOAST', payload: id }),
+    toggleSidebar: ()                      => dispatch({ type: 'TOGGLE_SIDEBAR' }),
+    resetAll:      ()                      => dispatch({ type: 'RESET_ALL' }),
+    setExamDate:   (date, label)           => dispatch({ type: 'SET_EXAM', payload: { date, label } }),
   };
 
   return (
