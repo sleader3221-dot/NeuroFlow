@@ -6,7 +6,7 @@ import {
   BarChart, Bar
 } from 'recharts';
 import { TrendingUp, Clock, BookOpen, Brain, Target, Award, Calendar } from 'lucide-react';
-import { predictPerformance } from '../utils/ai';
+import { predictPerformance, getEbbinghausCurve } from '../utils/ai';
 
 const COLORS = ['#7c3aed', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#f97316'];
 
@@ -270,6 +270,65 @@ export default function Analytics() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Ebbinghaus Forgetting Curve */}
+      <div className="glass-card" style={{ marginTop: 'var(--space-6)' }}>
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <h3 style={{ fontSize: 'var(--text-lg)' }}>📉 Ebbinghaus Forgetting Curve</h3>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>
+            Memory retention over time — SM-2 spaced repetition reschedules reviews before you forget
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart
+            data={getEbbinghausCurve(
+              flashcards.length > 0
+                ? Math.round(flashcards.reduce((a, c) => a + (c.repetitions || 0), 0) / flashcards.length)
+                : 0,
+              flashcards.length > 0
+                ? flashcards.reduce((a, c) => a + (c.easeFactor || 2.5), 0) / flashcards.length
+                : 2.5
+            )}
+            margin={{ top: 5, right: 10, bottom: 0, left: -20 }}
+          >
+            <defs>
+              <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false}
+              label={{ value: 'Days', position: 'insideRight', offset: -5, fill: 'var(--text-tertiary)', fontSize: 10 }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false}
+              tickFormatter={v => `${v}%`} />
+            <Tooltip
+              contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+              formatter={(v, name) => [`${v}%`, name === 'retention' ? 'Memory Retention' : 'Review Threshold']}
+            />
+            <Area type="monotone" dataKey="retention" stroke="#7c3aed" strokeWidth={2.5} fill="url(#retGrad)"
+              dot={false} name="retention" />
+            <Line type="monotone" dataKey="threshold" stroke="#f59e0b" strokeWidth={1.5}
+              strokeDasharray="6 3" dot={false} name="threshold" />
+          </AreaChart>
+        </ResponsiveContainer>
+        <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginTop: 12, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 24, height: 3, background: '#7c3aed', borderRadius: 2 }} /> Memory Retention
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 24, height: 3, background: '#f59e0b', borderRadius: 2, backgroundImage: 'repeating-linear-gradient(90deg, #f59e0b 0, #f59e0b 6px, transparent 6px, transparent 9px)' }} /> Review Threshold (70%)
+          </div>
+        </div>
+        <div style={{ marginTop: 12, padding: 'var(--space-3) var(--space-4)', background: 'rgba(124,58,237,0.08)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          💡 <strong>How SM-2 works:</strong> Each successful review exponentially increases the interval before the next review — keeping retention above the 70% threshold with minimum effort.
+          Your current average ease factor is <strong style={{ color: 'var(--primary-light)' }}>
+            {flashcards.length > 0
+              ? (flashcards.reduce((a, c) => a + (c.easeFactor || 2.5), 0) / flashcards.length).toFixed(2)
+              : '2.50'}
+          </strong>.
+        </div>
       </div>
     </div>
   );

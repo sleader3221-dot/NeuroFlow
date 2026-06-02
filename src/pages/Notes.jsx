@@ -1,8 +1,28 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Pin, Tag, Trash2, Edit3, X, Wand2, Save } from 'lucide-react';
+import { Plus, Search, Pin, Tag, Trash2, Edit3, X, Wand2, Save, Eye, EyeOff, Code } from 'lucide-react';
 import { summarizeText } from '../utils/ai';
 import { generateId } from '../utils/storage';
+
+// Lightweight Markdown → HTML converter (no external deps)
+function mdToHtml(md) {
+  if (!md) return '';
+  return md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^#{3}\s+(.+)$/gm,'<h3>$1</h3>')
+    .replace(/^#{2}\s+(.+)$/gm,'<h2>$1</h2>')
+    .replace(/^#{1}\s+(.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code style="background:rgba(124,58,237,0.15);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:0.9em">$1</code>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>')
+    .replace(/^\d+\.\s+(.+)$/gm,'<li>$1</li>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:#a78bfa">$1</a>')
+    .replace(/^---$/gm,'<hr style="border-color:rgba(255,255,255,0.1)">')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/^(.+)$/gm, (m) => m.startsWith('<') ? m : `<p>${m}</p>`);
+}
 
 const NOTE_COLORS = ['#7c3aed', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#f97316', '#8b5cf6', '#14b8a6'];
 
@@ -12,8 +32,9 @@ export default function Notes() {
 
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
-  const [editNote, setEditNote] = useState(null); // note being edited
+  const [editNote, setEditNote] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [newNote, setNewNote] = useState({ title: '', content: '', subject: subjects[0]?.name || '', color: NOTE_COLORS[0], tags: '', pinned: false });
   const [summarizing, setSummarizing] = useState(false);
   const [summary, setSummary] = useState('');
@@ -92,8 +113,37 @@ export default function Notes() {
         </div>
       </div>
       <div>
-        <label className="label">Content</label>
-        <textarea className="input textarea" style={{ minHeight: 200 }} placeholder="Write your notes here..." value={data.content} onChange={e => onChange({ ...data, content: e.target.value })} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label className="label" style={{ margin: 0 }}>Content <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 400 }}>— Markdown supported</span></label>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ fontSize: 11, padding: '3px 10px', gap: 4 }}
+            onClick={() => setShowPreview(p => !p)}
+          >
+            {showPreview ? <><EyeOff size={12}/> Edit</> : <><Eye size={12}/> Preview</>}
+          </button>
+        </div>
+        {showPreview ? (
+          <div
+            style={{
+              minHeight: 200, padding: 'var(--space-4)',
+              background: 'var(--bg-glass)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)', lineHeight: 1.7,
+              fontSize: 'var(--text-sm)', color: 'var(--text-primary)',
+              overflow: 'auto',
+            }}
+            dangerouslySetInnerHTML={{ __html: mdToHtml(data.content) || '<p style="color:var(--text-tertiary)">Nothing to preview yet…</p>' }}
+          />
+        ) : (
+          <textarea
+            className="input textarea"
+            style={{ minHeight: 200, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+            placeholder={"# Heading\n**Bold**, *italic*, `code`\n- bullet list\n\nWrite your notes here..."}
+            value={data.content}
+            onChange={e => onChange({ ...data, content: e.target.value })}
+          />
+        )}
       </div>
       <div>
         <label className="label">Tags (comma separated)</label>

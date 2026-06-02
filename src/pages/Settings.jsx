@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { generateId } from '../utils/storage';
 import {
@@ -19,6 +19,9 @@ export default function Settings() {
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [newSubject, setNewSubject] = useState({ name: '', color: SUBJECT_COLORS[0], icon: SUBJECT_ICONS[0] });
   const [newGoal, setNewGoal] = useState({ title: '', subject: subjects[0]?.name || '', target: 100, unit: '% completion', deadline: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] });
+  const [notifPermission, setNotifPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unavailable');
+  const [reminderTime, setReminderTime] = useState(localStorage.getItem('neuroflow_reminder_time') || '20:00');
+  const [reminderEnabled, setReminderEnabled] = useState(localStorage.getItem('neuroflow_reminder_enabled') === 'true');
 
   function saveProfile() {
     actions.updateProfile(localProfile);
@@ -66,12 +69,53 @@ export default function Settings() {
     }
   }
 
+  async function requestNotifications() {
+    if (typeof Notification === 'undefined') { actions.toast('Notifications not supported in this browser', 'warning'); return; }
+    const perm = await Notification.requestPermission();
+    setNotifPermission(perm);
+    if (perm === 'granted') {
+      new Notification('NeuroFlow AI 🧠', {
+        body: 'Study reminders are now enabled! We will remind you to review your cards.',
+        icon: '/favicon.svg',
+      });
+      actions.toast('Notifications enabled! ✅', 'success');
+    } else {
+      actions.toast('Notification permission denied', 'warning');
+    }
+  }
+
+  function saveReminder() {
+    localStorage.setItem('neuroflow_reminder_time', reminderTime);
+    localStorage.setItem('neuroflow_reminder_enabled', reminderEnabled ? 'true' : 'false');
+    actions.toast(reminderEnabled ? `⏰ Reminder set for ${reminderTime} daily!` : 'Reminders disabled', 'success');
+    // Schedule immediate test notification if enabled
+    if (reminderEnabled && notifPermission === 'granted') {
+      const [h, m] = reminderTime.split(':').map(Number);
+      const now = new Date();
+      let target = new Date();
+      target.setHours(h, m, 0, 0);
+      if (target <= now) target.setDate(target.getDate() + 1);
+      const ms = target - now;
+      setTimeout(() => {
+        if (Notification.permission === 'granted') {
+          new Notification('NeuroFlow Study Reminder 📚', {
+            body: `Time to review your flashcards! You have cards due today.`,
+            icon: '/favicon.svg',
+            badge: '/favicon.svg',
+          });
+        }
+      }, ms);
+    }
+  }
+
+
   const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'subjects', label: 'Subjects', icon: Database },
-    { id: 'goals', label: 'Goals', icon: Target },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'data', label: 'Data', icon: Download },
+    { id: 'profile',       label: 'Profile',       icon: User },
+    { id: 'subjects',      label: 'Subjects',       icon: Database },
+    { id: 'goals',         label: 'Goals',          icon: Target },
+    { id: 'notifications', label: 'Notifications',  icon: Bell },
+    { id: 'appearance',    label: 'Appearance',     icon: Palette },
+    { id: 'data',          label: 'Data',           icon: Download },
   ];
 
   return (
@@ -277,6 +321,75 @@ export default function Settings() {
                   <Plus size={15} /> Add Goal
                 </button>
               )}
+            </div>
+          )}
+
+          {/* NOTIFICATIONS TAB */}
+          {activeTab === 'notifications' && (
+            <div className="settings-section">
+              <h3>🔔 Study Reminders</h3>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-5)' }}>
+                Get browser notifications to remind you to study every day.
+              </p>
+
+              {/* Permission status */}
+              <div style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-lg)', background: notifPermission === 'granted' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${notifPermission === 'granted' ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                      {notifPermission === 'granted' ? '✅ Notifications Enabled' : notifPermission === 'denied' ? '🚫 Notifications Blocked' : '⚠️ Notifications Not Enabled'}
+                    </div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                      {notifPermission === 'granted' ? 'Browser will deliver study reminders.' : notifPermission === 'denied' ? 'You blocked notifications. Enable in browser settings.' : 'Click the button to enable browser notifications.'}
+                    </div>
+                  </div>
+                  {notifPermission !== 'granted' && notifPermission !== 'denied' && (
+                    <button className="btn btn-primary btn-sm" onClick={requestNotifications}>
+                      <Bell size={14} /> Enable Notifications
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Reminder config */}
+              {notifPermission === 'granted' && (
+                <>
+                  <div className="setting-row">
+                    <div className="setting-info">
+                      <div className="setting-label">Daily Reminder</div>
+                      <div className="setting-desc">Receive a daily study reminder at your chosen time</div>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <div style={{ position: 'relative', width: 44, height: 24 }}>
+                        <input type="checkbox" checked={reminderEnabled}
+                          onChange={e => setReminderEnabled(e.target.checked)}
+                          style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }} />
+                        <div style={{ position: 'absolute', inset: 0, borderRadius: 12, background: reminderEnabled ? 'var(--primary)' : 'var(--bg-glass)', border: '1px solid var(--border)', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setReminderEnabled(v => !v)} />
+                        <div style={{ position: 'absolute', top: 3, left: reminderEnabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left 0.2s', pointerEvents: 'none' }} />
+                      </div>
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{reminderEnabled ? 'On' : 'Off'}</span>
+                    </label>
+                  </div>
+                  <div className="setting-row">
+                    <div className="setting-info">
+                      <div className="setting-label">Reminder Time</div>
+                      <div className="setting-desc">What time should we remind you?</div>
+                    </div>
+                    <input type="time" className="input" style={{ width: 130 }}
+                      value={reminderTime} onChange={e => setReminderTime(e.target.value)} />
+                  </div>
+                  <div style={{ marginTop: 'var(--space-4)' }}>
+                    <button className="btn btn-primary" onClick={saveReminder}>
+                      <Save size={15} /> Save Reminder
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Info section */}
+              <div style={{ marginTop: 'var(--space-5)', padding: 'var(--space-4)', background: 'rgba(124,58,237,0.06)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                <strong>💡 How it works:</strong> NeuroFlow uses the browser's Web Notifications API to schedule daily study reminders. Reminders will appear even if the tab is in the background. No account or server required — fully private.
+              </div>
             </div>
           )}
 

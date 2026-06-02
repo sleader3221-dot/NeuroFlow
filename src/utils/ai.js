@@ -447,6 +447,7 @@ function shuffleArray(arr) {
   return a;
 }
 
+
 export function getLearningStyle(answers) {
   const styles = ['Visual', 'Auditory', 'Reading/Writing', 'Kinesthetic'];
   const scores = answers.reduce((acc, a) => { acc[a] = (acc[a] || 0) + 1; return acc; }, {});
@@ -460,3 +461,139 @@ export function getLearningStyle(answers) {
   };
   return { style, description: descriptions[style], tips: getStudyTips() };
 }
+
+// ============================================================
+// AI FLASHCARD AUTO-GENERATOR FROM TEXT
+// ============================================================
+export function generateFlashcardsFromText(text, subject = 'General', count = 8) {
+  if (!text || text.trim().length < 30) return [];
+
+  const sentences = text
+    .replace(/\n+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 20 && s.length < 300);
+
+  const cards = [];
+
+  // Pattern 1: "X is/are Y" → What is X? / Y
+  const isPattern = /^(.{3,50}?)\s+(?:is|are|was|were|refers to|means|defined as)\s+(.{10,200})/i;
+
+  // Pattern 2: "X = Y" (equations/formulas)
+  const eqPattern = /^(.{2,40}?)\s*[=:]\s*(.{5,200})/;
+
+  // Pattern 3: key terms detection
+  const keyTerms = ['theorem', 'law', 'principle', 'equation', 'formula', 'concept', 'process', 'method', 'algorithm', 'definition', 'rule', 'theory'];
+
+  sentences.forEach(sentence => {
+    if (cards.length >= count) return;
+
+    const isMatch = sentence.match(isPattern);
+    if (isMatch) {
+      cards.push({
+        front: `What ${isMatch[0].match(/\bwere?\b|\bwas\b/i) ? 'was' : 'is'} ${isMatch[1].trim()}?`,
+        back: isMatch[2].trim().replace(/\.$/, '') + '.',
+      });
+      return;
+    }
+
+    const eqMatch = sentence.match(eqPattern);
+    if (eqMatch && eqMatch[1].length < 40) {
+      cards.push({
+        front: `What is the value/formula for: ${eqMatch[1].trim()}?`,
+        back: eqMatch[2].trim(),
+      });
+      return;
+    }
+
+    const hasKeyTerm = keyTerms.some(t => sentence.toLowerCase().includes(t));
+    if (hasKeyTerm && sentence.length > 40) {
+      const words = sentence.split(' ');
+      const pivot = Math.floor(words.length / 2);
+      cards.push({
+        front: `Complete: "${words.slice(0, pivot).join(' ')} ___?"`,
+        back: words.slice(pivot).join(' '),
+      });
+    }
+  });
+
+  // Fill remaining slots with definition-style cards from full text
+  const remaining = count - cards.length;
+  if (remaining > 0 && sentences.length > cards.length) {
+    const unused = sentences.filter((_, i) => i >= cards.length);
+    unused.slice(0, remaining).forEach(s => {
+      const words = s.split(' ');
+      if (words.length < 6) return;
+      // Pick a meaningful noun phrase as the "question"
+      cards.push({
+        front: `Explain: "${words.slice(0, Math.min(6, Math.floor(words.length / 2))).join(' ')}..."`,
+        back: s,
+      });
+    });
+  }
+
+  const now = new Date().toISOString();
+  return cards.slice(0, count).map(c => ({
+    front: c.front,
+    back: c.back,
+    subject,
+    difficulty: 2,
+    interval: 1,
+    repetitions: 0,
+    easeFactor: 2.5,
+    nextReview: now,
+    tags: ['ai-generated'],
+  }));
+}
+
+// ============================================================
+// EBBINGHAUS FORGETTING CURVE
+// ============================================================
+export function getEbbinghausCurve(repetitions = 0, easeFactor = 2.5) {
+  // R(t) = e^(-t/S) where S = stability (days before 90% forgotten)
+  // SM-2 approximate stability: 1, 6, 6*EF, 6*EF^2, ...
+  const stabilities = [1, 6];
+  for (let i = 2; i <= Math.max(repetitions, 5); i++) {
+    stabilities.push(Math.round(stabilities[stabilities.length - 1] * easeFactor));
+  }
+  const S = stabilities[Math.min(repetitions, stabilities.length - 1)];
+
+  return Array.from({ length: 30 }, (_, day) => {
+    const retention = Math.round(Math.exp(-day / (S * 1.4)) * 100);
+    return { day, retention: Math.max(0, retention), threshold: 70 };
+  });
+}
+
+// ============================================================
+// EXAM READINESS (enhanced)
+// ============================================================
+export function getExamReadiness(sessions, flashcards, avgScore, examDate) {
+  const daysLeft = examDate
+    ? Math.max(0, Math.round((new Date(examDate) - new Date()) / 86400000))
+    : null;
+  const totalCards = flashcards.length;
+  const masteredCards = flashcards.filter(c => c.repetitions >= 4).length;
+  const masteryPct = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
+  const studyDays = new Set(sessions.map(s => s.date)).size;
+  const consistencyScore = Math.min(100, studyDays * 7);
+  const quizScore = avgScore || 0;
+  const readiness = Math.round((masteryPct * 0.4) + (quizScore * 0.35) + (consistencyScore * 0.25));
+
+  return {
+    readiness,
+    daysLeft,
+    masteryPct,
+    quizScore,
+    consistencyScore,
+    studyDays,
+    masteredCards,
+    totalCards,
+    status: readiness >= 80 ? '🟢 Exam Ready' : readiness >= 60 ? '🟡 Getting There' : '🔴 Needs Work',
+    tip: readiness >= 80
+      ? 'Excellent! Focus on weak spots and get good sleep before the exam.'
+      : readiness >= 60
+      ? 'Good progress! Increase daily reviews and take more practice quizzes.'
+      : 'Start with flashcard basics and build consistency — every day counts!',
+  };
+}
+

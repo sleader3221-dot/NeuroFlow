@@ -13,6 +13,8 @@ import StudyPlan from './pages/StudyPlan';
 import KnowledgeGraph from './pages/KnowledgeGraph';
 import Settings from './pages/Settings';
 import Achievements from './pages/Achievements';
+import FocusSounds from './pages/FocusSounds';
+import WeeklyReport from './pages/WeeklyReport';
 
 // Guard: redirect to /login if user hasn't set their name yet
 function AuthGuard({ children }) {
@@ -48,6 +50,8 @@ export default function App() {
             <Route path="knowledge-graph" element={<KnowledgeGraph />} />
             <Route path="achievements"    element={<Achievements />} />
             <Route path="settings"        element={<Settings />} />
+            <Route path="focus-sounds"    element={<FocusSounds />} />
+            <Route path="weekly-report"   element={<WeeklyReport />} />
           </Route>
 
           {/* ── Catch-all ── */}

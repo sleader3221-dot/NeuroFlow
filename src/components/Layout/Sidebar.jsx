@@ -2,7 +2,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard, BookOpen, Brain, FileText, Timer, BarChart3,
-  MessageSquare, Map, Network, Trophy, Settings, Zap, Flame, Star, ChevronRight
+  MessageSquare, Map, Network, Trophy, Settings, Zap, Flame, Star, ChevronRight,
+  Music2, ClipboardList
 } from 'lucide-react';
 
 const navItems = [
@@ -14,12 +15,14 @@ const navItems = [
 ];
 
 const advancedItems = [
-  { path: '/ai-tutor', label: 'AI Tutor', icon: MessageSquare, badge: 'AI' },
-  { path: '/study-plan', label: 'Study Plan', icon: Map, badge: 'AI' },
-  { path: '/knowledge-graph', label: 'Knowledge Graph', icon: Network },
-  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/achievements', label: 'Achievements', icon: Trophy },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/ai-tutor',        label: 'AI Tutor',         icon: MessageSquare, badge: 'AI' },
+  { path: '/study-plan',      label: 'Study Plan',       icon: Map,           badge: 'AI' },
+  { path: '/focus-sounds',    label: 'Focus Sounds',     icon: Music2 },
+  { path: '/knowledge-graph', label: 'Knowledge Graph',  icon: Network },
+  { path: '/analytics',       label: 'Analytics',        icon: BarChart3 },
+  { path: '/weekly-report',   label: 'Weekly Report',    icon: ClipboardList },
+  { path: '/achievements',    label: 'Achievements',     icon: Trophy },
+  { path: '/settings',        label: 'Settings',         icon: Settings },
 ];
 
 export default function Sidebar() {

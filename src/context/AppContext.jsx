@@ -29,6 +29,8 @@ function getInitialState() {
     chatHistory: storage.get('chatHistory', []),
     dailyChallenges: storage.get('dailyChallenges', getDefaultChallenges()),
     achievements: storage.get('achievements', []),
+    examDate: storage.get('examDate', null),
+    examLabel: storage.get('examLabel', ''),
   };
 }
 
@@ -192,6 +194,9 @@ function reducer(state, action) {
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
 
+    case 'SET_EXAM':
+      return { ...state, examDate: action.payload.date, examLabel: action.payload.label };
+
     // Full reset (wipe localStorage and reset to defaults)
     case 'RESET_ALL':
       storage.clear();
@@ -221,6 +226,8 @@ export function AppProvider({ children }) {
     storage.set('quizResults', state.quizResults);
     storage.set('chatHistory', state.chatHistory);
     storage.set('dailyChallenges', state.dailyChallenges);
+    storage.set('examDate', state.examDate);
+    storage.set('examLabel', state.examLabel);
   }, [state]);
 
   // Apply theme to document
@@ -255,7 +262,7 @@ export function AppProvider({ children }) {
     deleteSubject: (id) => dispatch({ type: 'DELETE_SUBJECT', payload: id }),
 
     addFlashcard: (card) => dispatch({ type: 'ADD_FLASHCARD', payload: { id: generateId(), ...card } }),
-    addFlashcards: (cards) => dispatch({ type: 'ADD_FLASHCARDS', payload: cards }),
+    addFlashcards: (cards) => dispatch({ type: 'ADD_FLASHCARDS', payload: cards.map(c => ({ id: generateId(), ...c })) }),
     updateFlashcard: (card) => dispatch({ type: 'UPDATE_FLASHCARD', payload: card }),
     deleteFlashcard: (id) => dispatch({ type: 'DELETE_FLASHCARD', payload: id }),
 
@@ -370,6 +377,7 @@ export function AppProvider({ children }) {
     removeToast: (id) => dispatch({ type: 'REMOVE_TOAST', payload: id }),
     toggleSidebar: () => dispatch({ type: 'TOGGLE_SIDEBAR' }),
     resetAll: () => dispatch({ type: 'RESET_ALL' }),
+    setExamDate: (date, label) => dispatch({ type: 'SET_EXAM', payload: { date, label } }),
   };
 
   return (

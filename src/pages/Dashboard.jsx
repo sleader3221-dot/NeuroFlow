@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   BookOpen, Brain, Timer, FileText, TrendingUp, Zap, Flame, Target,
-  Clock, Award, ArrowRight, Plus, ChevronRight, Star, BarChart3, CheckCircle
+  Clock, Award, ArrowRight, Plus, ChevronRight, Star, BarChart3, CheckCircle,
+  Calendar, Music2, ClipboardList, Edit3
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  RadialBarChart, RadialBar, BarChart, Bar, CartesianGrid
+  BarChart, Bar, CartesianGrid
 } from 'recharts';
 import { getUpcomingReviews, getDueCards } from '../utils/spacedRepetition';
 
@@ -31,8 +32,15 @@ function AnimatedCounter({ value, suffix = '' }) {
 
 export default function Dashboard() {
   const { state, actions } = useApp();
-  const { profile, subjects, flashcards, studySessions, goals, dailyChallenges } = state;
+  const { profile, subjects, flashcards, studySessions, goals, dailyChallenges, examDate, examLabel } = state;
   const navigate = useNavigate();
+
+  // Exam countdown
+  const daysUntilExam = examDate
+    ? Math.max(0, Math.round((new Date(examDate) - new Date()) / 86400000))
+    : null;
+  const [showExamInput, setShowExamInput] = useState(false);
+  const [examForm, setExamForm] = useState({ date: examDate || '', label: examLabel || '' });
 
   const dueCards = getDueCards(flashcards).length;
   const totalStudyHours = Math.round(profile.totalStudyTime / 60);
@@ -336,6 +344,88 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Exam Countdown */}
+      <div className="glass-card" style={{ marginTop: 'var(--space-6)', background: daysUntilExam !== null && daysUntilExam <= 7 ? 'rgba(239,68,68,0.06)' : 'rgba(124,58,237,0.06)', border: `1px solid ${daysUntilExam !== null && daysUntilExam <= 7 ? 'rgba(239,68,68,0.25)' : 'rgba(124,58,237,0.2)'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontSize: 40 }}>{daysUntilExam !== null && daysUntilExam <= 3 ? '🚨' : daysUntilExam !== null && daysUntilExam <= 7 ? '⏰' : '📅'}</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 'var(--text-xl)', fontFamily: 'var(--font-heading)', color: daysUntilExam !== null && daysUntilExam <= 7 ? 'var(--danger)' : 'var(--primary-light)' }}>
+                {daysUntilExam !== null
+                  ? daysUntilExam === 0 ? '🎯 Exam Day!' : `${daysUntilExam} days until ${examLabel || 'Exam'}`
+                  : 'Set Your Exam Date'}
+              </div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 2 }}>
+                {daysUntilExam !== null
+                  ? `${examDate} · Stay focused and review your weak areas!`
+                  : 'Add your exam date to track your readiness and countdown.'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {daysUntilExam !== null && (
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/weekly-report')}>
+                <ClipboardList size={14} /> View Report
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowExamInput(v => !v)}>
+              <Edit3 size={14} /> {examDate ? 'Edit' : 'Set Exam'}
+            </button>
+          </div>
+        </div>
+        {showExamInput && (
+          <div style={{ marginTop: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', padding: 'var(--space-4)', background: 'var(--bg-glass)', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <label className="label">Exam Name</label>
+              <input className="input" placeholder="e.g. JEE Mains, GATE, Finals..."
+                value={examForm.label} onChange={e => setExamForm(f => ({ ...f, label: e.target.value }))} />
+            </div>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <label className="label">Exam Date</label>
+              <input type="date" className="input"
+                min={new Date().toISOString().split('T')[0]}
+                value={examForm.date} onChange={e => setExamForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => {
+              if (!examForm.date) { actions.toast('Pick a date!', 'warning'); return; }
+              actions.setExamDate(examForm.date, examForm.label || 'Exam');
+              setShowExamInput(false);
+              actions.toast(`⏳ Exam countdown set! ${Math.round((new Date(examForm.date)-new Date())/86400000)} days to go.`, 'success');
+            }}>
+              <Calendar size={14} /> Save
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Feature Links */}
+      <div className="grid grid-4" style={{ marginTop: 'var(--space-6)' }}>
+        {[
+          { label: 'Focus Sounds', icon: Music2, color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', path: '/focus-sounds', desc: 'Ambient study music' },
+          { label: 'Weekly Report', icon: ClipboardList, color: '#10b981', bg: 'rgba(16,185,129,0.1)', path: '/weekly-report', desc: 'Your progress summary' },
+          { label: 'Study Plan', icon: Target, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', path: '/study-plan', desc: 'AI-powered roadmap' },
+          { label: 'Knowledge Graph', icon: Zap, color: '#06b6d4', bg: 'rgba(6,182,212,0.1)', path: '/knowledge-graph', desc: 'Visual concept map' },
+        ].map(a => (
+          <div key={a.label} onClick={() => navigate(a.path)} style={{
+            padding: 'var(--space-4)', background: a.bg,
+            border: `1px solid ${a.color}33`,
+            borderRadius: 'var(--radius-xl)', cursor: 'pointer',
+            transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 12,
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: a.bg, border: `1px solid ${a.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <a.icon size={18} color={a.color} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: a.color }}>{a.label}</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{a.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
